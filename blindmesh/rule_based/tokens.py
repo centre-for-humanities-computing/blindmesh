@@ -7,6 +7,32 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class TokenFilter(TransformerMixin, BaseEstimator):
+    """Sklearn component that filters out certain tokens given some attributes
+    of them. Texts that are passed to the component have to be sentencized and
+    tokenized already.
+    All parameters are optional, if nothing is passed into the constructor
+    it will act as the identity.
+
+    Parameters
+    ----------
+    negative: iterable of str, default ()
+        Tokens to remove, could be stop words or anyhting of
+        the kind.
+    length_range: tuple, default (0, None)
+        A tuple of the lower and upper boundary on token length.
+        If an integer it will be interpreted as absolute character count.
+        If a float it will be interpreted as a quantile, and will be learned
+        from data using reservoir sampling.
+    frequency_range: tuple of (float, float), default (0.0, 1.0)
+        Tuple of lower and upper frequency values.
+        Frequency is learned from the data and is determined on the document
+        level.
+    max_memory: int, default 5000
+        Maximum size of the reservoir sampled token length pool.
+        This is what the lenght quantiles are calculated from.
+        Lower number means worse estimate, but lower memory usage.
+    """
+
     def __init__(
         self,
         negative: Iterable[str] = (),
@@ -46,6 +72,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         self.frequencies = Counter()
 
     def append_reservoir(self, token: str):
+        """Adds token length to the pool with reservoir sampling."""
         if self.seen_lengths < self.max_memory:
             self.length_pool.append(len(token))
         else:
@@ -55,9 +82,31 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         self.seen_lengths += 1
 
     def fit(self, X: list[list[list[str]]], y=None):
+        """Fits filter to the data.
+
+        Parameters
+        ----------
+        X: list of list of list of str
+            Documents sentencized and tokenized.
+
+        Returns
+        -------
+        self
+        """
         return self.partial_fit(X, y)
 
     def partial_fit(self, X: list[list[list[str]]], y=None):
+        """Online fits filter to the data.
+
+        Parameters
+        ----------
+        X: list of list of list of str
+            Documents sentencized and tokenized.
+
+        Returns
+        -------
+        self
+        """
         tokens = []
         for doc in X:
             for sent in doc:
@@ -72,6 +121,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         return self
 
     def passes(self, token: str) -> bool:
+        """Determines whether a token passes the filter or not."""
         token_length = len(token)
         token_frequency = self.frequencies.get(token, 0) / sum(
             self.frequencies.values()
@@ -91,6 +141,19 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         )
 
     def transform(self, X: list[list[list[str]]]) -> list[list[list[str]]]:
+        """Filters out tokens that do not pass based on the provided
+        set of rules.
+
+        Parameters
+        ----------
+        X: list of list of list of str
+            Documents sentencized and tokenized.
+
+        Returns
+        -------
+        list of list of list of str
+            Documents with the problematic tokens removed.
+        """
         res = []
         for doc in X:
             res_sents = []
