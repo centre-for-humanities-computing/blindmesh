@@ -1,6 +1,6 @@
 import random
 from collections import Counter
-from typing import Union
+from typing import Iterable, Union
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 class TokenFilter(TransformerMixin, BaseEstimator):
     def __init__(
         self,
-        negative: list[str],
+        negative: Iterable[str] = (),
         length_range: tuple[Union[int, float], Union[int, float, None]] = (
             0,
             None,
@@ -25,7 +25,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
             self.min_length_quantile = False
             self.min_length = self.minl
         elif isinstance(self.minl, float):
-            self.min_length_quantile = False
+            self.min_length_quantile = True
             self.min_length = 0
         else:
             raise ValueError("Minimum length either has to be float or int.")
@@ -33,7 +33,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
             self.max_length_quantile = False
             self.max_length = self.minl
         elif isinstance(self.maxl, float):
-            self.max_length_quantile = False
+            self.max_length_quantile = True
             self.max_length = None
         elif self.maxl is None:
             self.max_length_quantile = False
@@ -54,6 +54,9 @@ class TokenFilter(TransformerMixin, BaseEstimator):
                 self.length_pool[j] = len(token)
         self.seen_lengths += 1
 
+    def fit(self, X: list[list[list[str]]], y=None):
+        return self.partial_fit(X, y)
+
     def partial_fit(self, X: list[list[list[str]]], y=None):
         tokens = []
         for doc in X:
@@ -66,10 +69,13 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         if self.min_length_quantile:
             self.min_length = np.quantile(self.length_pool, self.minl)  # type: ignore
         self.frequencies.update(tokens)
+        return self
 
     def passes(self, token: str) -> bool:
         token_length = len(token)
-        token_frequency = self.frequencies.get(token, 0)
+        token_frequency = self.frequencies.get(token, 0) / sum(
+            self.frequencies.values()
+        )
         max_pass: bool = (self.max_length is None) or (
             token_length <= self.max_length
         )
