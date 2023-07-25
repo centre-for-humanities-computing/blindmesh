@@ -49,6 +49,9 @@ class SentenceFilter(TransformerMixin, BaseEstimator):
                 self.length_pool[j] = len(sentence)
         self.seen_lengths += 1
 
+    def fit(self, X: list[list[list[str]]], y=None):
+        return self.partial_fit(X)
+
     def partial_fit(self, X: list[list[list[str]]], y=None):
         for doc in X:
             for sent in doc:
@@ -57,6 +60,7 @@ class SentenceFilter(TransformerMixin, BaseEstimator):
             self.max_length = np.quantile(self.length_pool, self.maxl)  # type: ignore
         if self.min_length_quantile:
             self.min_length = np.quantile(self.length_pool, self.minl)  # type: ignore
+        return self
 
     def passes(self, sentence: list[str]) -> bool:
         sent_len = len(sentence)
